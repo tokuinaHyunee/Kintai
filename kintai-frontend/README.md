@@ -23,7 +23,7 @@ UI 언어는 일본어, 코드 주석은 한국어로 작성되어 있습니다.
 | 항목 | 버전 |
 |------|------|
 | Spring Boot | 3.4.4 |
-| Java | 17 |
+| Java | 21 |
 | Spring Security + JWT | - |
 | Spring Data JPA (Hibernate) | - |
 | MySQL | 8.x |
@@ -41,35 +41,43 @@ kintai-frontend/              # React + TypeScript 프론트엔드 (Vite, port 5
 │   ├── components/
 │   │   ├── Topbar.tsx        # 상단 헤더 (CSV 송신 버튼 포함)
 │   │   ├── Sidebar.tsx       # 좌측 네비게이션 메뉴
-│   │   └── AdminMailbox/     # 관리자 CSV 메일함 패널
-│   ├── hooks/useAuth.ts      # JWT 인증 상태 관리 훅
+│   │   ├── AdminMailbox/     # 관리자 CSV 메일함 패널
+│   │   └── CorrectionRequestModal/  # 근태 수정 신청 모달
+│   ├── contexts/AuthContext.tsx  # 전역 인증 상태 (AuthProvider / useAuthContext)
+│   ├── hooks/useAuth.ts      # JWT 토큰 자동 갱신 · 비활동 로그아웃 훅
 │   ├── pages/
-│   │   ├── Login/            # 사원 로그인
-│   │   ├── AdminLogin/       # 관리자 로그인
+│   │   ├── Login/            # 사원·관리자 통합 로그인
 │   │   ├── Dashboard/        # 출퇴근 대시보드
 │   │   ├── MonthlyRecord/    # 월간 근태 실적
 │   │   ├── AdminMonthlyRecord/ # 전 사원 월간 실적 (관리자)
+│   │   ├── AdminLeave/       # 휴가 신청 승인·거절 (관리자)
 │   │   ├── EmployeeMaster/   # 사원 계정 관리 (관리자)
 │   │   └── Upload/           # CSV 업로드 (관리자)
 │   ├── styles/global.css     # 전역 CSS 변수 및 공통 스타일
-│   └── types/index.ts        # 공통 TypeScript 타입 정의
+│   ├── types/index.ts        # 공통 TypeScript 타입 정의
+│   └── utils/                # date.ts · error.ts · labels.ts
 
 kintai-backend/               # Spring Boot 백엔드 (port 8080, context: /kintai-backend)
 └── src/main/java/com/example/kintai/
-    ├── config/               # Spring Security 설정, JWT 필터
+    ├── config/               # SecurityConfig, GlobalExceptionHandler
     ├── controller/
-    │   ├── AuthController.java          # 로그인 / JWT 발급
-    │   ├── AttendanceController.java    # 출퇴근 타임스탬프 / CSV 메일함 송신
-    │   ├── SummaryController.java       # 월간·주간 집계 / CSV 내보내기
-    │   ├── ImportController.java        # 관리자 CSV 일괄 등록
-    │   ├── CsvSubmissionController.java # CSV 메일함 (목록·내용조회·완료처리·삭제)
-    │   ├── AdminController.java         # 전 사원 실적 조회
-    │   └── EmployeeMasterController.java# 사원·계정 CRUD
+    │   ├── AuthController.java              # 로그인 / JWT 발급
+    │   ├── AttendanceController.java        # 출퇴근 타임스탬프 / CSV 메일함 송신
+    │   ├── SummaryController.java           # 월간·주간 집계 / CSV 내보내기
+    │   ├── ImportController.java            # 관리자 CSV 일괄 등록
+    │   ├── CsvSubmissionController.java     # CSV 메일함 (목록·내용조회·완료처리·삭제)
+    │   ├── AdminController.java             # 전 사원 실적 / 계정 CRUD
+    │   ├── LeaveController.java             # 사원 휴가 신청·조회
+    │   ├── CorrectionRequestController.java # 근태 수정 신청
+    │   └── EmployeeMasterController.java    # 사원·계정 CRUD
     ├── dto/                  # 요청·응답 DTO 클래스
-    ├── entity/               # JPA 엔티티
+    ├── entity/               # JPA 엔티티 (Account, Employee, WorkTime, GoOutRecord,
+    │                         #   LeaveRequest, CsvSubmission, CorrectionRequest, BatchImportHistory)
+    ├── exception/            # BusinessException, ResourceNotFoundException
     ├── repository/           # Spring Data JPA Repository 인터페이스
-    ├── security/             # JWT 토큰 프로바이더 및 필터
-    └── service/              # 비즈니스 로직 (AuthService 등)
+    ├── security/             # JwtTokenProvider, JwtAuthenticationFilter
+    ├── service/              # AttendanceService, AuthService, LeaveService
+    └── util/                 # DateTimeUtil, EmployeeResolver
 ```
 
 ---
@@ -78,7 +86,7 @@ kintai-backend/               # Spring Boot 백엔드 (port 8080, context: /kint
 
 ### 사전 요구사항
 
-- Java 17 이상
+- Java 21 이상
 - Node.js 18 이상
 - MySQL 8.x
 
@@ -162,6 +170,8 @@ VALUES (
 | 출근 / 퇴근 | 버튼 클릭으로 현재 시각 타임스탬프 기록 |
 | 외출 / 외출 복귀 | 업무 중 외출 기록 |
 | 업무 내용 메모 | 당일 업무 내용 자유 입력 및 저장 |
+| 휴가 신청 | 연차·반차(오전·오후)·병가 신청 |
+| 근태 수정 신청 | 출퇴근 기록 수정 요청 모달 |
 | 월간 근태 실적 | 달력 + 주간 집계 바 + 근무기록 목록 (월간·주간 전환) |
 | CSV 송신 | 근무표 CSV 파일을 관리자 메일함으로 전송 |
 
@@ -170,6 +180,7 @@ VALUES (
 | 기능 | 설명 |
 |------|------|
 | 전 사원 월간 실적 | 전체 사원 월별 출근일수·노동시간·잔업시간 조회 및 PDF 출력 |
+| 휴가 승인 / 거절 | 사원 휴가 신청 목록 조회 및 승인·거절 (거절 사유 입력) |
 | CSV 업로드 | CSV 파일 미리보기 후 근태 데이터 일괄 등록 |
 | CSV 메일함 | 사원 송신 CSV 수신 → 업로드 탭에서 내용 확인 후 등록 |
 | 사원 관리 | 계정 생성 (8자리 사원번호 + 자동 비밀번호 발급) / 삭제 |
@@ -244,6 +255,13 @@ VALUES (
 | GET | `/api/summary/monthly?month=YYYY-MM` | 월간 집계 |
 | GET | `/api/summary/export?month=YYYY-MM` | CSV 내보내기 |
 
+### 사원 휴가 (인증 필요)
+
+| 메서드 | URL | 설명 |
+|--------|-----|------|
+| POST | `/api/leaves` | 휴가 신청 |
+| GET | `/api/leaves` | 내 휴가 신청 목록 |
+
 ### 관리자 (ADMIN 권한 필요)
 
 | 메서드 | URL | 설명 |
@@ -253,6 +271,10 @@ VALUES (
 | POST | `/api/admin/accounts` | 사원 등록 |
 | DELETE | `/api/admin/accounts/{id}` | 사원 삭제 |
 | POST | `/api/admin/import/attendance` | CSV 근태 일괄 등록 |
+| GET | `/api/admin/leaves?status=` | 휴가 신청 목록 |
+| GET | `/api/admin/leaves/pending-count` | 미승인 건수 |
+| PUT | `/api/admin/leaves/{id}/approve` | 승인 |
+| PUT | `/api/admin/leaves/{id}/reject` | 거절 (거절 사유 포함) |
 
 ### CSV 메일함 (ADMIN 권한 필요)
 
@@ -272,10 +294,12 @@ VALUES (
 |--------|------|
 | `employee` | 사원 기본 정보 (이름, 부서, 활성 여부) |
 | `account` | 로그인 계정 (사원번호, 비밀번호 BCrypt, 권한 USER/ADMIN) |
-| `work_time` | 근태 기록 (출근·퇴근·외출·휴식·노동시간·잔업시간·메모) |
+| `work_time` | 근태 기록 (출근·퇴근·노동시간·잔업시간·메모) |
+| `go_out_record` | 외출·복귀 기록 (work_time 연관) |
+| `leave_request` | 휴가 신청 (상태: PENDING / APPROVED / REJECTED, 거절 사유) |
 | `csv_submission` | 사원 송신 CSV 원본 보관 (상태: PENDING / IMPORTED) |
 | `batch_import_history` | CSV 일괄 등록 이력 |
-| `correction_request` | (레거시 미사용) 수정 신청 이력 |
+| `correction_request` | 근태 수정 신청 이력 |
 
 ---
 

@@ -8,8 +8,8 @@ React + Spring Boot + MySQL 기반의 일본어 근태관리 웹 애플리케이
 
 | 영역 | 기술 |
 |---|---|
-| Frontend | React 18, TypeScript, Vite, Axios, React Router v6 |
-| Backend | Spring Boot 3, Spring Security, JWT, JPA/Hibernate |
+| Frontend | React 19, TypeScript 6, Vite 8, Axios, React Router v7 |
+| Backend | Spring Boot 3.4.4, Spring Security, JWT (jjwt 0.12.3), JPA/Hibernate |
 | Database | MySQL 8 |
 | Build | Gradle (백엔드), npm (프론트엔드) |
 
@@ -31,6 +31,7 @@ React + Spring Boot + MySQL 기반의 일본어 근태관리 웹 애플리케이
 - 휴가 신청 승인 / 거절
 - 사원 계정 생성 · 삭제
 - CSV 일괄 임포트
+- CSV 메일함 (사원 제출 CSV 수신 → 확인 후 일괄 등록)
 
 ---
 
@@ -66,7 +67,7 @@ kintai/
 ## 시작하기
 
 ### 사전 요구 사항
-- Java 17+
+- Java 21+
 - Node.js 18+
 - MySQL 8
 
@@ -114,16 +115,27 @@ npm run dev
 | 근태 | POST | `/api/attendance/clock-out` | 퇴근 |
 | 근태 | POST | `/api/attendance/go-out` | 외출 |
 | 근태 | POST | `/api/attendance/go-out-return` | 외출 복귀 |
+| 근태 | POST | `/api/attendance/work-memo` | 업무 내용 저장 |
+| 근태 | POST | `/api/attendance/submit-csv` | CSV 관리자 메일함 송신 |
 | 집계 | GET | `/api/summary/monthly?month=` | 월간 집계 |
+| 집계 | GET | `/api/summary/weekly?month=` | 주간 집계 |
+| 집계 | GET | `/api/summary/export?month=` | CSV 내보내기 |
 | 휴가 | POST | `/api/leaves` | 휴가 신청 |
 | 휴가 | GET | `/api/leaves` | 내 신청 목록 |
 | 관리자 | GET | `/api/admin/monthly-summary?month=` | 전사원 집계 |
 | 관리자 | GET | `/api/admin/leaves` | 휴가 신청 목록 |
+| 관리자 | GET | `/api/admin/leaves/pending-count` | 미승인 건수 |
 | 관리자 | PUT | `/api/admin/leaves/{id}/approve` | 승인 |
 | 관리자 | PUT | `/api/admin/leaves/{id}/reject` | 거절 |
 | 관리자 | GET | `/api/admin/accounts` | 사원 목록 |
 | 관리자 | POST | `/api/admin/accounts` | 사원 생성 |
 | 관리자 | DELETE | `/api/admin/accounts/{id}` | 사원 삭제 |
+| 관리자 | POST | `/api/admin/import/attendance` | CSV 근태 일괄 등록 |
+| CSV메일함 | GET | `/api/admin/csv-submissions/pending-count` | 미확인 건수 |
+| CSV메일함 | GET | `/api/admin/csv-submissions?status=` | 수신 목록 |
+| CSV메일함 | GET | `/api/admin/csv-submissions/{id}/content` | CSV 원본 조회 |
+| CSV메일함 | POST | `/api/admin/csv-submissions/{id}/mark-imported` | 등록 완료 마킹 |
+| CSV메일함 | DELETE | `/api/admin/csv-submissions/{id}` | 삭제 |
 
 ---
 
@@ -180,3 +192,13 @@ npm run dev
 | `JWT_SECRET` | JWT 서명 키 (32바이트 이상) | `openssl rand -base64 32` |
 | `DB_PASSWORD` | MySQL 비밀번호 | — |
 | `cors.allowed-origins` | 허용 프론트엔드 오리진 | `https://yourdomain.com` |
+
+---
+
+## 관련 문서
+
+| 문서 | 설명 |
+|---|---|
+| [要件定義書](要件定義書.docx) | 요건 정의서 |
+| [基本設計書](基本設計書.docx) | 기본 설계서 |
+| [詳細設計書](詳細設計書.docx) | 상세 설계서 |
