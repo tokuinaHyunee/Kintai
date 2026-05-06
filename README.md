@@ -185,15 +185,6 @@ npm run dev
 
 ---
 
-## 환경 변수 (프로덕션 권장)
-
-| 변수 | 설명 | 예시 |
-|---|---|---|
-| `JWT_SECRET` | JWT 서명 키 (32바이트 이상) | `openssl rand -base64 32` |
-| `DB_PASSWORD` | MySQL 비밀번호 | — |
-| `cors.allowed-origins` | 허용 프론트엔드 오리진 | `https://yourdomain.com` |
-
----
 
 ## 관련 문서
 
